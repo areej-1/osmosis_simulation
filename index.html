@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Osmosis Simulation</title>
+<style>
+  body { font-family: Arial, sans-serif; display: flex; flex-direction: column; align-items: center; margin-top: 20px; }
+  #simulation { border: 2px solid #000; height: 300px; width: 600px; display: flex; position: relative; overflow: hidden; }
+  #membrane { position: absolute; top: 0; bottom: 0; left: 299px; width: 2px; background-color: #000; }
+  .side { flex: 1; display: flex; justify-content: center; align-items: center; position: relative; overflow: hidden; }
+  .water { background-color: #ADD8E6; position: absolute; bottom: 0; width: 100%; transition: height 0.5s; } /* Light blue for water, with transition for smooth height change */
+  .sucrose { position: absolute; bottom: 0; width: 100%; height: 50%; background-color: #EA7D70; } /* Light coral for sucrose solution */
+  .additionalWater {
+    background-color: #ADD8E6; 
+    position: absolute; 
+    bottom: 50%; /* Fixed bottom at the top of the sucrose solution */
+    width: 100%; 
+    height: 0%; /* Start with 0% height */
+    transition: height 0.5s; 
+  }
+</style>
+</head>
+<body>
+<h2>Osmosis Simulation</h2>
+<div id="simulation">
+  <div id="membrane"></div>
+  <div class="side">
+    <div class="water" id="waterSide" style="height: 50%;">Water</div>
+  </div>
+  <div class="side">
+    <div class="sucrose" id="sucrose" style="height: 50%;">Sucrose Solution</div>
+    <div class="additionalWater" id="additionalWater"></div> <!-- Additional water block fixed at top -->
+  </div>
+</div>
+
+<div class="control">
+  <label for="elapsedTime">Elapsed Time (minutes):</label>
+  <input type="range" id="elapsedTime" name="elapsedTime" min="0" max="60" value="0">
+  <span id="timeValue">0</span>
+</div>
+<div class="control">
+    <label for="sucroseVolume">Sucrose Solution Volume (millilitres):</label>
+    <input type="range" id="sucroseVolume" name="sucroseVolume" min="0" max="50" value="50">
+    <span id="sucroseVolumeValue">50</span>
+</div>
+<div class="control">
+    <label for="sucroseConcentration">Sucrose Concentration (%):</label>
+    <input type="range" id="sucroseConcentration" name="sucroseConcentration" min="0" max="100" value="50">
+    <span id="sucroseConcentrationValue">50</span>%
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    function hexToRgb(hex) {
+        // Convert hex colour values to RGB
+        let r = 0, g = 0, b = 0;
+        if (hex.length === 4) {
+            r = parseInt(hex[1] + hex[1], 16);
+            g = parseInt(hex[2] + hex[2], 16);
+            b = parseInt(hex[3] + hex[3], 16);
+        } else if (hex.length === 7) {
+            r = parseInt(hex[1] + hex[2], 16);
+            g = parseInt(hex[3] + hex[4], 16);
+            b = parseInt(hex[5] + hex[6], 16);
+        }
+        return [r, g, b];
+    }
+
+    function interpolateColour(colour1, colour2, factor) {
+        // Linear interpolation between two colours based on factor
+        let result = colour1.slice();
+        for (let i = 0; i < 3; i++) {
+            result[i] = Math.round(result[i] + factor * (colour2[i] - colour1[i]));
+        }
+        return result;
+    }
+    function updateColour(concentration) {
+    	const startColour = hexToRgb("#F69F95"); // Lightest
+    	const midColour = hexToRgb("#EA7D70"); // Midpoint colour at 50%
+    	const endColour = hexToRgb("#9D3E3B"); // Darkest
+
+    	let colour;
+    	if (concentration <= 50) {
+        	// Scale concentration to [0, 1] for the first half
+        	let scaledConcentration = concentration / 50;
+        	colour = interpolateColour(startColour, midColour, scaledConcentration);
+    	} else {
+        	// Scale concentration to [0, 1] for the second half
+        	let scaledConcentration = (concentration - 50) / 50;
+        	colour = interpolateColour(midColour, endColour, scaledConcentration);
+    	}
+
+    	return `rgb(${colour[0]}, ${colour[1]}, ${colour[2]})`;
+    }
+
+
+    function updateLevels() {
+        let elapsedTime = parseInt(document.getElementById('elapsedTime').value);
+        let sucroseVolume = parseInt(document.getElementById('sucroseVolume').value);
+        let sucroseConcentration = parseInt(document.getElementById('sucroseConcentration').value);
+
+        document.getElementById('timeValue').textContent = elapsedTime + ' minute(s)';
+        document.getElementById('sucroseVolumeValue').textContent = sucroseVolume + 'ml';
+        document.getElementById('sucroseConcentrationValue').textContent = sucroseConcentration + '%';
+
+        // Replace the part where you adjust the sucrose colour with this:
+	let sucroseColour = updateColour(sucroseConcentration);
+	document.getElementById('sucrose').style.backgroundColor = sucroseColour;
+
+
+        let sucroseHeight = sucroseVolume; // Height based on volume
+        document.getElementById('sucrose').style.height = `${sucroseHeight}%`;
+
+        let baseIncrease = 40; // Base value for maximum water movement
+        let volumeFactor = sucroseVolume / 50; // Assuming 50ml is the max volume for the slider
+        let concentrationFactor = sucroseConcentration / 100; // Normalize concentration to a 0-1 scale
+
+        let adjustedMaximumIncrease = (elapsedTime / 60 * baseIncrease) * volumeFactor * concentrationFactor;
+        adjustedMaximumIncrease = Math.min(adjustedMaximumIncrease, baseIncrease * volumeFactor);
+
+        let initialWaterHeight = 50; // Assuming the container starts half full
+        let newWaterHeight = initialWaterHeight - adjustedMaximumIncrease;
+        document.getElementById('waterSide').style.height = `${Math.max(newWaterHeight, 0)}%`;
+
+        let newAdditionalWaterHeight = Math.min(adjustedMaximumIncrease, baseIncrease * volumeFactor);
+        document.getElementById('additionalWater').style.height = `${newAdditionalWaterHeight}%`;
+        document.getElementById('additionalWater').style.bottom = `${sucroseHeight}%`;
+    }
+
+    document.getElementById('elapsedTime').addEventListener('input', updateLevels);
+    document.getElementById('sucroseVolume').addEventListener('input', updateLevels);
+    document.getElementById('sucroseConcentration').addEventListener('input', updateLevels);
+
+    // Initialize the simulation state based on default slider values
+    updateLevels(); // Call this function to set initial states, including the correct colour
+});
+</script>
+
+
+</body>
+</html>
